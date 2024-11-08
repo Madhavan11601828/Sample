@@ -66,3 +66,47 @@ if __name__ == "__main__":
     # Calibrate the threshold
     best_threshold = calibrate_threshold(prompts, MODEL_IDS["gpt-4o"], MODEL_IDS["gpt-4o-mini"])
     print(f"Optimal threshold determined: {best_threshold}")
+
+
+
+import argparse
+import yaml
+import json
+import pandas as pd
+from datasets import load_dataset, Dataset
+
+# Configuration for matrix factorization (MF) model
+GET_AUGMENTED_CONFIG = {
+    "checkpoint_path": "/app/routellm/mf_gpt4_augmented/model.safetensors",
+}
+
+# Function to calibrate the threshold for the matrix factorization model
+def calibrate_threshold(routers, strong_model_pct):
+    # Load the thresholds dataset from Hugging Face Hub
+    thresholds_df = load_dataset(
+        "routellm/lmsys-arena-human-preference-55k-thresholds", split="train"
+    ).to_pandas()
+
+    # Calibrate threshold for each router
+    for router in routers:
+        threshold = thresholds_df[router].quantile(q=1 - strong_model_pct)
+        print(
+            f"For {strong_model_pct * 100}% strong model calls for {router}, threshold = {round(threshold, 5)}"
+        )
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--strong-model-pct", type=float, required=True,
+        help="Percentage of strong model calls to calibrate the threshold for."
+    )
+    parser.add_argument(
+        "--routers",
+        nargs="+",
+        type=str,
+        default=["matrix_factorization"],
+        help="List of routers to calibrate thresholds for."
+    )
+    args = parser.parse_args()
+
+    calibrate_threshold(args.routers, args.strong_model_pct)
