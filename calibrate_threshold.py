@@ -1,112 +1,96 @@
+import argparse
 import torch
-import numpy as np
-from main import MFModel, Controller, get_prompt_embedding, MODEL_IDS
-
-# Configure logging
+import yaml
 import logging
+import json
+from main import get_prompt_embedding, MODEL_IDS, MFModel, GET_AUGMENTED_CONFIG
+from safetensors.torch import load_file
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize your model configuration
-dim = 128
-num_models = 64
-text_dim = 1024
-num_classes = 2
-use_proj = True
-checkpoint_path = "/app/routellm/mf_gpt4_augmented/model.safetensors"
-
-# Initialize the model and load checkpoint
-model = MFModel(dim=dim, num_models=num_models, text_dim=text_dim, num_classes=num_classes, use_proj=use_proj)
-model.load(checkpoint_path)
-model.eval().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+# Load the matrix factorization model
+def load_matrix_factorization_model():
+    model = MFModel(
+        dim=128,
+        num_models=64,
+        text_dim=1536,
+        num_classes=1,
+        use_proj=True,
+    )
+    checkpoint_path = GET_AUGMENTED_CONFIG["checkpoint_path"]
+    tensor_dict = load_file(checkpoint_path)
+    model.load_state_dict(tensor_dict, strict=False)
+    model.eval().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    return model
 
 # Calibration function for threshold
 def calibrate_threshold(prompts, model_a_id, model_b_id, start=0.1, end=0.9, step=0.05):
-    thresholds = np.arange(start, end, step)
-    best_threshold = 0.0
-    best_accuracy = 0.0
+    model = load_matrix_factorization_model()
 
-    for threshold in thresholds:
-        correct = 0
-        total = len(prompts)
+    best_threshold = start
+    highest_accuracy = 0
+
+    for threshold in range(int(start * 100), int(end * 100), int(step * 100)):
+        threshold = threshold / 100.0
+        correct_predictions = 0
 
         for prompt in prompts:
+            # Get embedding for the prompt
             prompt_embedding = get_prompt_embedding(prompt)
-            winrate = model.predict_win_rate(model_a_id, model_b_id, prompt_embedding)
 
-            # Choose the model based on the current threshold
-            selected_model = "gpt-4" if winrate >= threshold else "gpt-4o-mini"
-            # Here, we assume "gpt-4" should win more often if the prompt is complex, based on some ground truth
-            # For demonstration purposes, you may need to adjust the condition based on actual requirements
+            # Predict win rate for the models using matrix factorization
+            with torch.no_grad():
+                logits = model.forward(
+                    model_ids=[model_a_id, model_b_id], prompt_embed=prompt_embedding
+                )
 
-            if (winrate >= threshold and selected_model == "gpt-4") or (winrate < threshold and selected_model == "gpt-4o-mini"):
-                correct += 1
+                # Handle multi-element logits
+                if logits.dim() > 1:
+                    logits = logits.squeeze()
 
-        accuracy = correct / total
-        logger.info(f"Threshold: {threshold}, Accuracy: {accuracy}")
+                # Calculate winrate using logits difference
+                if logits.numel() == 2:
+                    winrate = torch.sigmoid(logits[0] - logits[1]).item()
+                elif logits.numel() == 1:
+                    winrate = torch.sigmoid(logits).item()
+                else:
+                    raise ValueError(f"Unexpected logits shape: {logits.shape}")
 
-        if accuracy > best_accuracy:
-            best_accuracy = accuracy
+            # Determine if the prediction is correct based on the threshold
+            if (winrate >= threshold and model_a_id == MODEL_IDS["gpt-4o"]) or \
+               (winrate < threshold and model_b_id == MODEL_IDS["gpt-4o-mini"]):
+                correct_predictions += 1
+
+        # Calculate accuracy for the current threshold
+        accuracy = correct_predictions / len(prompts)
+
+        # Update best threshold if the current accuracy is higher
+        if accuracy > highest_accuracy:
+            highest_accuracy = accuracy
             best_threshold = threshold
 
-    logger.info(f"Best threshold: {best_threshold} with accuracy: {best_accuracy}")
-    return best_threshold
-
-# Example usage with sample prompts
-if __name__ == "__main__":
-    # Define some example prompts to calibrate the threshold
-    prompts = [
-        "What is the weather like today?",
-        "Explain the theory of relativity.",
-        "What are the health benefits of drinking water?",
-        "Describe the process of photosynthesis.",
-        "What is quantum mechanics?"
-    ]
-
-    # Calibrate the threshold
-    best_threshold = calibrate_threshold(prompts, MODEL_IDS["gpt-4o"], MODEL_IDS["gpt-4o-mini"])
-    print(f"Optimal threshold determined: {best_threshold}")
-
-
-
-import argparse
-import yaml
-import json
-import pandas as pd
-from datasets import load_dataset, Dataset
-
-# Configuration for matrix factorization (MF) model
-GET_AUGMENTED_CONFIG = {
-    "checkpoint_path": "/app/routellm/mf_gpt4_augmented/model.safetensors",
-}
-
-# Function to calibrate the threshold for the matrix factorization model
-def calibrate_threshold(routers, strong_model_pct):
-    # Load the thresholds dataset from Hugging Face Hub
-    thresholds_df = load_dataset(
-        "routellm/lmsys-arena-human-preference-55k-thresholds", split="train"
-    ).to_pandas()
-
-    # Calibrate threshold for each router
-    for router in routers:
-        threshold = thresholds_df[router].quantile(q=1 - strong_model_pct)
-        print(
-            f"For {strong_model_pct * 100}% strong model calls for {router}, threshold = {round(threshold, 5)}"
-        )
+    return best_threshold, highest_accuracy
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--strong-model-pct", type=float, required=True,
-        help="Percentage of strong model calls to calibrate the threshold for."
-    )
-    parser.add_argument(
-        "--routers",
-        nargs="+",
-        type=str,
-        default=["matrix_factorization"],
-        help="List of routers to calibrate thresholds for."
-    )
+    parser.add_argument("--prompts", type=str, required=True, help="Path to the JSON file with prompts")
+    parser.add_argument("--start", type=float, default=0.1, help="Start value for threshold")
+    parser.add_argument("--end", type=float, default=0.9, help="End value for threshold")
+    parser.add_argument("--step", type=float, default=0.05, help="Step size for threshold")
     args = parser.parse_args()
 
-    calibrate_threshold(args.routers, args.strong_model_pct)
+    # Load prompts from a JSON file
+    with open(args.prompts, "r") as f:
+        prompts = json.load(f)
+
+    # Define model IDs for calibration
+    model_a_id = MODEL_IDS["gpt-4o"]
+    model_b_id = MODEL_IDS["gpt-4o-mini"]
+
+    # Calibrate the threshold
+    best_threshold, best_accuracy = calibrate_threshold(
+        prompts, model_a_id, model_b_id, start=args.start, end=args.end, step=args.step
+    )
+
+    print(f"Best threshold: {best_threshold}, Best accuracy: {best_accuracy}")
