@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 # Load the matrix factorization model
 def load_matrix_factorization_model():
     model = MFModel(
-        dim=128,
+        dim=128,  # Adjusted to match the checkpoint dimensions
         num_models=64,
         text_dim=1536,
         num_classes=1,
