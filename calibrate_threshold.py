@@ -1,6 +1,5 @@
 import argparse
 import torch
-import yaml
 import logging
 import json
 from main import get_prompt_embedding, MODEL_IDS, MFModel, GET_AUGMENTED_CONFIG
@@ -9,10 +8,10 @@ from safetensors.torch import load_file
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Load the matrix factorization model
+# Load the matrix factorization model with adjusted dimensions
 def load_matrix_factorization_model():
     model = MFModel(
-        dim=128,  # Set to match the checkpoint dimensions
+        dim=128,  # Set to match checkpoint dimensions
         num_models=64,
         text_dim=1536,
         num_classes=1,
@@ -20,24 +19,19 @@ def load_matrix_factorization_model():
     )
     checkpoint_path = GET_AUGMENTED_CONFIG["checkpoint_path"]
     tensor_dict = load_file(checkpoint_path)
-
-    # Try to load the state dict, overriding mismatched layers
-    missing_keys, unexpected_keys = model.load_state_dict(tensor_dict, strict=False)
     
-    # Log any missing or unexpected keys
-    if missing_keys:
-        logger.warning(f"Missing keys when loading state_dict: {missing_keys}")
-    if unexpected_keys:
-        logger.warning(f"Unexpected keys when loading state_dict: {unexpected_keys}")
-
-    # Initialize any missing layers with proper weights if needed
-    for key in missing_keys:
-        if "weight" in key:
-            layer = getattr(model, key.split(".")[0])
-            torch.nn.init.xavier_uniform_(layer.weight)
-        if "bias" in key:
-            layer = getattr(model, key.split(".")[0])
-            torch.nn.init.zeros_(layer.bias)
+    try:
+        # Attempt to load state dict and log mismatches
+        missing_keys, unexpected_keys = model.load_state_dict(tensor_dict, strict=False)
+        
+        if missing_keys:
+            logger.warning(f"Missing keys when loading state_dict: {missing_keys}")
+        if unexpected_keys:
+            logger.warning(f"Unexpected keys when loading state_dict: {unexpected_keys}")
+            
+    except RuntimeError as e:
+        logger.error(f"RuntimeError in loading state_dict: {e}")
+        raise e
 
     model.eval().to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
     return model
