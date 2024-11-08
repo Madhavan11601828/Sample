@@ -1,0 +1,12 @@
+fastapi==0.115.0
+uvicorn==0.30.6
+openai==1.51.0
+python-dotenv==1.0.1
+pydantic==2.9.2
+litellm==1.48.17
+torch==2.4.1
+tqdm==4.66.5
+transformers==4.45.1
+tenacity==9.0.0
+requests==2.32.3
+pandas==2.2.3
