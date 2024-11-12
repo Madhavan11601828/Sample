@@ -1,19 +1,20 @@
+import torch
+import hashlib
+from safetensors.torch import load_file
+import logging
+
 class MFModel(torch.nn.Module):
     def __init__(self, dim, num_models, text_dim, num_classes, use_proj):
         super(MFModel, self).__init__()
         self.use_proj = use_proj
         self.proj = torch.nn.Linear(text_dim, dim) if use_proj else torch.nn.Identity()
         self.P = torch.nn.Embedding(num_models, dim)
-        self.embedding_model = "text-embedding-ada-002"
         
         if self.use_proj:
             self.text_proj = torch.nn.Sequential(torch.nn.Linear(text_dim, dim, bias=False))
 
-        if text_dim != dim:
-            raise ValueError(f"text_dim {text_dim} must equal dim {dim} if not using projection")
-
         self.classifier = torch.nn.Sequential(
-            torch.nn.Linear(dim + dim, num_classes),
+            torch.nn.Linear(dim, num_classes),
             torch.nn.ReLU(),
             torch.nn.Linear(num_classes, num_classes),
         )
