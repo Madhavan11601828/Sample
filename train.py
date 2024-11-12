@@ -51,7 +51,7 @@ def train(model, data, epochs=5):
             # Forward pass
             optimizer.zero_grad()
             output = model(model_ids, prompt_embed)
-            output = output.squeeze()  # Squeeze to match label shape
+            output = output.squeeze(dim=-1)  # Squeeze only the last dimension
             loss = criterion(output, label)
             
             # Backward pass and optimization
@@ -65,6 +65,7 @@ def train(model, data, epochs=5):
 
 # Train the model
 train(model, data, epochs=10)
+
 
 
 # Save model weights
