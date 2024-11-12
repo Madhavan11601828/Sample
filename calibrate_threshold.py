@@ -4,13 +4,16 @@ from safetensors.torch import load_file
 import logging
 
 class MFModel(torch.nn.Module):
-    def __init__(self, dim, num_models, text_dim, num_classes, use_proj):
+    def __init__(self, dim=128, num_models=64, text_dim=1536, num_classes=1, use_proj=True):
         super(MFModel, self).__init__()
         self.use_proj = use_proj
         self.proj = torch.nn.Linear(text_dim, dim) if use_proj else torch.nn.Identity()
+        
+        # Updated to match checkpoint dimensions
         self.P = torch.nn.Embedding(num_models, dim)
         
         if self.use_proj:
+            # Updated to match checkpoint dimensions
             self.text_proj = torch.nn.Sequential(torch.nn.Linear(text_dim, dim, bias=False))
 
         self.classifier = torch.nn.Sequential(
