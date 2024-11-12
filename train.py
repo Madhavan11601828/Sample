@@ -37,14 +37,20 @@ def train(model, data, epochs=5):
     for epoch in range(epochs):
         total_loss = 0
         for item in data:
-            # Adjust the field names based on actual data structure
-            model_ids = [0] if item['model_id'] == 'mistral-8x7b-instruct-v0.1@fireworks-ai' else [1]  # Example encoding of model_id
+            # Safely retrieve model_id with a default value
+            model_id = item.get("model_id", "default-model")
+            model_ids = [0] if model_id == "mistral-8x7b-instruct-v0.1@fireworks-ai" else [1]  # Adjust as necessary
+
+            # Check if 'choices' and necessary subkeys exist
+            if "choices" not in item or not item["choices"] or "turns" not in item["choices"][0]:
+                print("Skipping entry due to missing 'choices' or 'turns'")
+                continue  # Skip this item if the structure is unexpected
 
             # Retrieve the text from 'choices[0]["turns"]' to use as the input prompt
-            prompt_text = item['choices'][0]['turns'][0]
-            prompt_embed = torch.rand(1536).float().to(device)  # Placeholder random embedding for the text
+            prompt_text = item["choices"][0]["turns"][0]
+            prompt_embed = torch.rand(1536).float().to(device)  # Placeholder random embedding
 
-            # Use a dummy label
+            # Use a dummy label since the sample data lacks an explicit target
             label = torch.tensor([1.0]).float().to(device)
 
             # Forward pass
