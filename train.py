@@ -37,11 +37,17 @@ def train(model, data, epochs=5):
     for epoch in range(epochs):
         total_loss = 0
         for item in data:
-            # Prepare inputs and target
-            model_ids = item['model_id']  # Example format, adjust based on actual data structure
-            prompt_embed = torch.tensor(item['prompt_embedding']).float().to(device)
-            label = torch.tensor([item['label']]).float().to(device)
-            
+            # Adjust the field names based on actual data structure
+            # Model ID for embeddings
+            model_ids = [0] if item['model_id'] == 'mistral-8x7b-instruct-v0.1@fireworks-ai' else [1]  # Example encoding of model_id
+
+            # Retrieve the text from 'choices[0]["turns"]' to use as the input prompt
+            prompt_text = item['choices'][0]['turns'][0]
+            prompt_embed = torch.rand(1536).float().to(device)  # Placeholder random embedding for the text
+
+            # Use a dummy label since the sample data lacks an explicit target
+            label = torch.tensor([1.0]).float().to(device)
+
             # Forward pass
             optimizer.zero_grad()
             output = model(model_ids, prompt_embed)
