@@ -38,20 +38,29 @@ def train(model, data, epochs=5):
         total_loss = 0
         for item in data:
             # Adjust the field names based on actual data structure
-            # Model ID for embeddings
             model_ids = [0] if item['model_id'] == 'mistral-8x7b-instruct-v0.1@fireworks-ai' else [1]  # Example encoding of model_id
 
             # Retrieve the text from 'choices[0]["turns"]' to use as the input prompt
             prompt_text = item['choices'][0]['turns'][0]
             prompt_embed = torch.rand(1536).float().to(device)  # Placeholder random embedding for the text
 
-            # Use a dummy label since the sample data lacks an explicit target
+            # Use a dummy label
             label = torch.tensor([1.0]).float().to(device)
 
             # Forward pass
             optimizer.zero_grad()
             output = model(model_ids, prompt_embed)
             output = output.squeeze(dim=-1)  # Squeeze only the last dimension
+            
+            # Debugging statements to check shapes
+            print(f"Output shape: {output.shape}, Label shape: {label.shape}")
+            
+            # Reshape label to match the output shape if needed
+            if output.shape != label.shape:
+                label = label.view_as(output)
+                print(f"Reshaped label to: {label.shape}")
+
+            # Calculate loss
             loss = criterion(output, label)
             
             # Backward pass and optimization
@@ -65,6 +74,7 @@ def train(model, data, epochs=5):
 
 # Train the model
 train(model, data, epochs=10)
+
 
 
 
