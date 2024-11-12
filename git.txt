@@ -1,0 +1,1 @@
+curl -X POST http://127.0.0.1:8000/llm/openai/deployments/smart-router/chat/completions -H "Content-Type: application/json" -d "{\"prompt\": \"test prompt\", \"messages\": [{\"role\": \"user\", \"content\": \"Hello\"}]}"
