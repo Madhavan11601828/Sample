@@ -1,0 +1,12 @@
+Design a system that integrates Azure OpenAI GPT models with a matrix factorization-based routing mechanism to dynamically select between strong and weak models based on input prompt embeddings. The system should:
+
+Accept natural language queries from users and convert them into embeddings using Azure OpenAI's embedding model.
+Compare the embeddings against pre-trained model metadata to compute a win rate using a matrix factorization mechanism.
+Dynamically route the query to either a strong or weak model based on a configurable threshold, ensuring that the most appropriate model processes the request.
+Log all operations, including win rate computation, model selection, and error handling.
+Include robust error handling to manage API failures, missing prompt data, or unexpected response structures.
+Use in-memory caching to optimize embedding reuse and minimize redundant API calls.
+Provide a health check endpoint to confirm the system is online.
+Allow for future extensibility, such as adding new models or updating the routing logic.
+Ensure the design can handle high-concurrency scenarios while maintaining low latency. Provide the detailed implementation steps for testing this system locally, including interactive testing via user input to send prompts. Include metrics such as win rate, selected model, and processed prompt in the response."
+
