@@ -1,0 +1,111 @@
+Overview
+The application simplifies the development and routing of prompts to various AI models by using matrix factorization techniques and leveraging Azure OpenAI services. It integrates logic for routing, embedding generation, and model selection seamlessly.
+
+Available Components & APIs
+1. Controller
+Purpose:
+
+Manages routing logic based on the win rate and threshold between strong and weak models.
+Determines which model to use for generating a response to a given prompt.
+Available Functions:
+
+route: Routes a prompt to the most appropriate model using matrix factorization.
+2. Prompt Embedding
+Purpose:
+
+Handles embedding generation for user prompts.
+Uses Azure OpenAI API to create embeddings and caches them to optimize performance.
+Available Functions:
+
+call_openai_for_embedding: Calls Azure OpenAI API to generate embeddings for prompts.
+get_prompt_embedding: Retrieves embeddings either from the cache or by making an API call.
+
+3. Matrix Factorization
+Purpose:
+
+Implements matrix factorization logic for evaluating model suitability.
+Uses a pre-trained PyTorch model stored in model.safetensors.
+Available Functions:
+
+predict_win_rate: Calculates the win rate between two models.
+load: Loads pre-trained weights for matrix factorization.
+4. Wrapper
+Purpose:
+
+Acts as a client library for interacting with the deployed application.
+Simplifies API calls to endpoints for health checks and chat completions.
+Available Functions:
+
+health_check: Checks the health of the deployed application.
+chat_completion: Routes prompts to the appropriate model and returns the generated response.
+API Workflow
+User Interaction:
+
+A user sends a prompt or a message to the /chat/completions API endpoint.
+Prompt Embedding:
+
+The application generates embeddings for the user prompt using Azure OpenAI API.
+Model Selection:
+
+The Controller uses the matrix factorization model to calculate win rates between available models.
+Based on the win rate and a pre-configured threshold, the appropriate model is selected.
+Response Generation:
+
+The selected model processes the prompt, and the response is returned to the user.
+Proposed Features
+The following functionalities are planned for future releases:
+
+Dynamic Model Selection:
+Allow integration of additional models dynamically.
+Vector Store API Integration:
+Support for uploading and retrieving vector embeddings for advanced use cases.
+Advanced Logging:
+Implement detailed logs for API calls, embeddings, and model performance.
+Development Use Cases
+New User Interaction:
+Create a new session for a user and route prompts to an appropriate model.
+Embedding Optimization:
+Cache embeddings to minimize API calls and reduce latency.
+Thread Management:
+Maintain conversation context by associating prompts and responses with a session thread.
+Endpoints
+1. Chat Completion
+Endpoint: /llm/openai/deployments/smart-router/chat/completions
+Method: POST
+Headers:
+X-USE_CASE: Specifies the use case of the request.
+Payload:
+json
+Copy code
+{
+    "prompt": "Your prompt here",
+    "messages": [],
+    "temperature": 0.7,
+    "top_p": 0.95,
+    "max_tokens": 800
+}
+Response:
+json
+Copy code
+{
+    "response": "Generated response",
+    "selected_model": "gpt-4-1106-preview"
+}
+2. Health Check
+Endpoint: /health
+Method: GET
+Response:
+json
+Copy code
+{
+    "status": "online"
+}
+Key Components
+Strong Model
+Description: A high-accuracy model used for complex tasks.
+Example: GPT-4.
+Weak Model
+Description: A lightweight model used for simpler tasks.
+Example: Mixtral-8x7b.
+Threshold
+Description: Determines when to switch between strong and weak models based on calculated win rates.
